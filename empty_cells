@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Check if the correct number of arguments is provided
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <filename> <separator>"
+    echo "Example: $0 bgg_dataset.txt ';'"
+    exit 1
+fi
+
+FILENAME="$1"
+SEPARATOR="$2"
+
+# Check if the file exists
+if [ ! -f "$FILENAME" ]; then
+    echo "Error: File '$FILENAME' not found."
+    exit 2
+fi
+
+# Create a temporary file with Unix line endings
+TEMP_FILE="$(mktemp)"
+tr -d '\r' < "$FILENAME" > "$TEMP_FILE"
+
+# Read header to get column names and remove leading slash if present
+HEADER_LINE="$(head -n 1 "$TEMP_FILE" | sed 's/^\///')"
+IFS="$SEPARATOR" read -r -a HEADER_COLUMNS <<< "$HEADER_LINE"
+
+# Process each column and count empty cells
+for ((i=0; i<${#HEADER_COLUMNS[@]}; i++)); do
+    COLUMN_NAME="${HEADER_COLUMNS[$i]}"
+    
+    # Use awk to count empty cells in this column
+    EMPTY_COUNT=$(awk -v col=$((i+1)) -v sep="$SEPARATOR" '
+        BEGIN {
+            count = 0
+        }
+        
+        # Skip header line
+        NR > 1 {
+            # Add a marker to the end of the line
+            line = $0 sep "MARKER"
+            
+            # Split the line into fields
+            num_fields = split(line, fields, sep)
+            
+            # Last field is our marker, so ignore it
+            num_fields--
+            
+            # Check if the column exists and if it is empty
+            if (col > num_fields || fields[col] == "" || fields[col] ~ /^[[:space:]]*$/) {
+                count++
+            }
+        }
+        
+        END {
+            print count
+        }
+    ' "$TEMP_FILE")
+    
+    printf "%s: %d\n" "$COLUMN_NAME" "${EMPTY_COUNT:-0}"
+done
+
+# Clean up temporary file
+rm -f "$TEMP_FILE"
