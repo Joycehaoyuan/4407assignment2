@@ -2,17 +2,18 @@
 
 This repository contains the code for Assignment 2 of the 4407 course.
 
-## Project Structure
+## Scripts
 
-The project is organized as follows:
+### 1. empty_cells.sh
+Identifies and counts empty cells in each column of the dataset.
 
-- `src/` - Source code directory
-- `tests/` - Test files directory
-- `docs/` - Documentation files
+**Usage**:
+`./empty_cells.sh <filename> <separator>`
+**Example**:
+`./empty_cells.sh bgg_dataset.txt ";"`
 
-## Getting Started
-
-Instructions for setting up and running the project will be added here.
+**Output**:
+Lists each column name followed by the number of empty cells found in that column.
 
 ## Features
 
@@ -24,6 +25,3 @@ Instructions for setting up and running the project will be added here.
 
 This is an assignment repository. Please refer to the course guidelines for contribution rules.
 
-## License
-
-This project is for educational purposes only. 
