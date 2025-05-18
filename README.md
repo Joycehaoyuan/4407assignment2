@@ -2,10 +2,15 @@
 
 This repository contains the code for Assignment 2 of the 4407 course.
 
-## Scripts
+## Scripts 1: empty_cells
 
-### 1. empty_cells.sh
 Identifies and counts empty cells in each column of the dataset.
+
+### Features:
+- Accepts any delimiter (e.g., `;`, `,`, or `TAB`)  
+- Skips the header row and processes real data only  
+- Outputs a list: column names + number of empty cells  
+- Helps locate and quantify data quality issues before preprocessing
 
 **Usage**:
 `./empty_cells.sh <filename> <separator>`
@@ -15,13 +20,21 @@ Identifies and counts empty cells in each column of the dataset.
 **Output**:
 Lists each column name followed by the number of empty cells found in that column.
 
-## Features
+## Script 2: preprocess
 
-- Feature 1
-- Feature 2
-- Feature 3
+This script performs initial data cleaning for the raw dataset and sends the cleaned output to standard output (stdout).
 
-## Contributing
+### Features:
+- Converts `;` separators to tab characters
+- Converts Windows `\r\n` line endings to Unix `\n`
+- Converts European decimal format (`,`) to `.` for floating-point numbers
+- Removes non-ASCII characters (e.g., CO₂ becomes CO)
+- Replaces missing IDs with unique new integer IDs continuing from the largest existing one
 
-This is an assignment repository. Please refer to the course guidelines for contribution rules.
+**Usage**:
+`./preprocess <filename>`
+**Example**:
+`./preprocess sample.txt`
 
+**Output**:
+Sends a cleaned version of the input data to standard output
