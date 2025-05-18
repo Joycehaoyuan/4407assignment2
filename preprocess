@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Check if input file is provided
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 input_file"
+    exit 1
+fi
+
+input_file="$1"
+output_file="${input_file%.*}.tsv"
+
+# Process the file
+awk -F';' '
+BEGIN {
+    OFS="\t"
+    max_id = 0
+}
+{
+    # Remove non-ASCII characters using tr
+    cmd = "echo \"" $0 "\" | tr -cd \"[:print:]\n\""
+    cmd | getline clean_line
+    close(cmd)
+    split(clean_line, fields, ";")
+    
+    # Find the maximum ID in the first pass
+    if (NR > 1 && fields[1] ~ /^[0-9]+$/) {
+        id = int(fields[1])
+        if (id > max_id) max_id = id
+    }
+    
+    # Store the line for second pass
+    lines[NR] = clean_line
+}
+END {
+    # Process header
+    split(lines[1], header_fields, ";")
+    for (i=1; i<=NF; i++) {
+        printf "%s%s", header_fields[i], (i==NF ? "\n" : OFS)
+    }
+    
+    # Process data lines
+    next_id = max_id + 1
+    for (line_num=2; line_num<=length(lines); line_num++) {
+        split(lines[line_num], fields, ";")
+        
+        # Handle empty or invalid IDs
+        if (fields[1] == "" || fields[1] !~ /^[0-9]+$/) {
+            fields[1] = next_id++
+        }
+        
+        # Convert comma to dot in floating point numbers
+        gsub(/,/, ".", fields[9])  # Rating Average
+        gsub(/,/, ".", fields[11]) # Complexity Average
+        
+        # Output the processed line
+        for (i=1; i<=length(fields); i++) {
+            printf "%s%s", fields[i], (i==length(fields) ? "\n" : OFS)
+        }
+    }
+}' "$input_file" > "$output_file"
+
+# Convert to Unix line endings
+dos2unix "$output_file" 2>/dev/null
+
+echo "Processed file saved as $output_file"
