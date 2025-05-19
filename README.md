@@ -16,10 +16,10 @@ Identifies and counts empty cells in each column of the dataset.
 `chmod +x empty_cells`
 
 **Usage**:
-`./empty_cells.sh <filename> <separator>`
+`./empty_cells <filename>`
 
 **Example**:
-`./empty_cells.sh bgg_dataset.txt ";"`
+`./empty_cells bgg_dataset.txt ";"`
 
 **Output**:
 Lists each column name followed by the number of empty cells found in that column.

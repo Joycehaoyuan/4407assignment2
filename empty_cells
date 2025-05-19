@@ -2,13 +2,13 @@
 
 # Check if the correct number of arguments is provided
 if [ $# -ne 2 ]; then
-    echo "Usage: $0 <filename> <separator>"
+    echo "Usage: $0 <filename>"
     echo "Example: $0 bgg_dataset.txt ';'"
     exit 1
 fi
 
 FILENAME="$1"
-SEPARATOR="$2"
+SEPARATOR=";"
 
 # Check if the file exists
 if [ ! -f "$FILENAME" ]; then
