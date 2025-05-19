@@ -1,65 +1,47 @@
 #!/bin/bash
 
-# Check if input file is provided
+# Check the number of arguments
 if [ $# -ne 1 ]; then
     echo "Usage: $0 input_file"
     exit 1
 fi
 
 input_file="$1"
-output_file="${input_file%.*}.tsv"
 
-# Process the file
-awk -F';' '
-BEGIN {
-    OFS="\t"
-    max_id = 0
-}
+# Create a temporary file for intermediate processing
+TMPFILE=$(mktemp)
+
+# 1. Convert to Unix line endings (remove Windows carriage returns)
+# 2. Remove all non-ASCII characters
+# 3. Replace semicolon separator with tab
+# 4. Replace all commas with dots
+cat "$input_file" \
+    | tr -d '\r' \
+    | tr -cd '\11\12\15\40-\176' \
+    | sed 's/;/\t/g' \
+    | sed 's/,/./g' > "$TMPFILE"
+
+# 5. Use awk to fill in missing IDs and print to standard output
+awk -F'\t' '
+NR==1 {print; next} # Print header directly
 {
-    # Remove non-ASCII characters using tr
-    cmd = "echo \"" $0 "\" | tr -cd \"[:print:]\n\""
-    cmd | getline clean_line
-    close(cmd)
-    split(clean_line, fields, ";")
-    
-    # Find the maximum ID in the first pass
-    if (NR > 1 && fields[1] ~ /^[0-9]+$/) {
-        id = int(fields[1])
-        if (id > max_id) max_id = id
-    }
-    
-    # Store the line for second pass
-    lines[NR] = clean_line
+    # Record the maximum ID
+    if($1 ~ /^[0-9]+$/ && $1 > max_id) max_id = $1
+    lines[NR]=$0
 }
 END {
-    # Process header
-    split(lines[1], header_fields, ";")
-    for (i=1; i<=NF; i++) {
-        printf "%s%s", header_fields[i], (i==NF ? "\n" : OFS)
-    }
-    
-    # Process data lines
     next_id = max_id + 1
-    for (line_num=2; line_num<=length(lines); line_num++) {
-        split(lines[line_num], fields, ";")
-        
-        # Handle empty or invalid IDs
-        if (fields[1] == "" || fields[1] !~ /^[0-9]+$/) {
-            fields[1] = next_id++
-        }
-        
-        # Convert comma to dot in floating point numbers
-        gsub(/,/, ".", fields[9])  # Rating Average
-        gsub(/,/, ".", fields[11]) # Complexity Average
-        
-        # Output the processed line
-        for (i=1; i<=length(fields); i++) {
-            printf "%s%s", fields[i], (i==length(fields) ? "\n" : OFS)
+    for(i=2; i<=NR; i++) {
+        split(lines[i], f, "\t")
+        # If ID is empty or not a number, fill it in
+        if(f[1] == "" || f[1] !~ /^[0-9]+$/) f[1] = next_id++
+        # Output
+        for(j=1; j<=length(f); j++) {
+            printf "%s%s", f[j], (j==length(f) ? "\n" : OFS)
         }
     }
-}' "$input_file" > "$output_file"
+}
+' OFS='\t' "$TMPFILE"
 
-# Convert to Unix line endings
-dos2unix "$output_file" 2>/dev/null
-
-echo "Processed file saved as $output_file"
+# Delete the temporary file
+rm "$TMPFILE"
