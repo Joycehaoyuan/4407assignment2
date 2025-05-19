@@ -14,10 +14,13 @@ Identifies and counts empty cells in each column of the dataset.
 
 **Setup**
 `chmod +x empty_cells`
+
 **Usage**:
 `./empty_cells.sh <filename> <separator>`
+
 **Example**:
 `./empty_cells.sh bgg_dataset.txt ";"`
+
 **Output**:
 Lists each column name followed by the number of empty cells found in that column.
 
@@ -34,10 +37,13 @@ This script performs initial data cleaning for the raw dataset and sends the cle
 
 **Setup**
 `chmod +x preprocess`
+
 **Usage**:
 `./preprocess <filename>`
+
 **Example**:
 `./preprocess sample.txt`
+
 **Output**:
 Sends a cleaned version of the input data to standard output
 
@@ -51,9 +57,12 @@ Performs statistical analysis on the cleaned dataset, such as computing yearly s
 
 **Setup**
 `chmod +x analysis`
+
 **Usage**
 `./analysis <filename>`
+
 **Example**:
 `./analysis sample.tsv`
+
 **Output**:
 Tabular summary printed to the terminal, showing statistics like average renewable generation per year.
