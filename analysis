@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Check if an input file is provided
+# Check if an input file is provided as an argument.
+# This ensures the script is called with the correct usage.
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <input_file>"
     echo "Example: $0 bgg_dataset.tsv"
@@ -9,17 +10,19 @@ fi
 
 INPUT_FILE=$1
 
-# Check if input file exists
+# Check if the input file actually exists.
+# This prevents errors from trying to process a non-existent file.
 if [ ! -f "$INPUT_FILE" ]; then
     echo "Error: Input file '$INPUT_FILE' does not exist."
     exit 2
 fi
 
-# Function to calculate Pearson correlation coefficient
+# Function to calculate the Pearson correlation coefficient between two columns.
+# Skips rows with missing or invalid data. If not enough valid data or denominator is zero, returns 0.
 calculate_correlation() {
     local x_col=$1
     local y_col=$2
-    
+
     awk -F'\t' -v x_col="$x_col" -v y_col="$y_col" '
     BEGIN {
         sum_x = 0; sum_y = 0;
@@ -28,10 +31,9 @@ calculate_correlation() {
         count = 0;
     }
     NR > 1 {
-        # Skip rows with missing data
+        # Only use rows where both columns are non-empty and numeric.
         if ($x_col != "" && $y_col != "" && $x_col ~ /^[0-9]+(\.[0-9]+)?$/ && $y_col ~ /^[0-9]+(\.[0-9]+)?$/) {
             x = $x_col; y = $y_col;
-            
             sum_x += x;
             sum_y += y;
             sum_x_squared += x * x;
@@ -41,17 +43,16 @@ calculate_correlation() {
         }
     }
     END {
+        # If not enough data, return 0.
         if (count < 2) {
-            print "Not enough data points";
+            print "0";
             exit;
         }
-        
-        # Calculate Pearson correlation coefficient
+        # Pearson correlation formula.
         numerator = count * sum_xy - sum_x * sum_y;
         denominator = sqrt((count * sum_x_squared - sum_x * sum_x) * (count * sum_y_squared - sum_y * sum_y));
-        
         if (denominator == 0) {
-            print "Undefined (denominator is zero)";
+            print "0";
         } else {
             correlation = numerator / denominator;
             printf "%.3f", correlation;
@@ -59,7 +60,8 @@ calculate_correlation() {
     }' "$INPUT_FILE"
 }
 
-# Find column indices for the required data
+# Read the header row and determine the column indices for required fields.
+# This makes the script robust to column order changes.
 HEADER=$(head -n 1 "$INPUT_FILE")
 IFS=$'\t' read -r -a COLUMNS <<< "$HEADER"
 
@@ -69,6 +71,7 @@ COMPLEXITY_COL=0
 MECHANICS_COL=0
 DOMAINS_COL=0
 
+# Find the index of each required column by name.
 for i in "${!COLUMNS[@]}"; do
     case "${COLUMNS[$i]}" in
         "Year Published") YEAR_COL=$((i+1)) ;;
@@ -79,77 +82,116 @@ for i in "${!COLUMNS[@]}"; do
     esac
 done
 
-# Ensure we found all the necessary columns
+# If any required column is missing, exit with an error.
 if [ $YEAR_COL -eq 0 ] || [ $RATING_COL -eq 0 ] || [ $COMPLEXITY_COL -eq 0 ] || [ $MECHANICS_COL -eq 0 ] || [ $DOMAINS_COL -eq 0 ]; then
     echo "Error: Required columns not found in input file"
     exit 3
 fi
 
-# 1. Find the most popular game mechanics
-echo "Analyzing most popular game mechanics..."
-# Remove quotes, split by commas, count occurrences, and find the most common
+# 1. Find the most popular game mechanics.
+# For each row, split the mechanics field by comma, count each mechanic.
+# If the field is empty or invalid, count as 'Unknown'.
+# If multiple mechanics are tied for most popular, output all, sorted alphabetically.
 most_popular_mechanics=$(awk -F'\t' -v col="$MECHANICS_COL" '
 BEGIN { FS="\t"; }
-NR > 1 && $col != "" {
-    # Remove quotes if present
+NR > 1 {
     mechanics = $col;
-    sub(/^"/, "", mechanics);
-    sub(/"$/, "", mechanics);
-    
-    # Split mechanics by comma and count each
-    n = split(mechanics, mechanics_array, ", ");
-    for (i = 1; i <= n; i++) {
-        count[mechanics_array[i]]++;
+    if (mechanics == "" || mechanics == "\"\"" || mechanics == "\"") {
+        count["Unknown"]++;
+    } else {
+        sub(/^"/, "", mechanics);
+        sub(/"$/, "", mechanics);
+        n = split(mechanics, mechanics_array, ", ");
+        for (i = 1; i <= n; i++) {
+            if (mechanics_array[i] == "" || mechanics_array[i] == "\"\"" || mechanics_array[i] == "\"") {
+                count["Unknown"]++;
+            } else {
+                count[mechanics_array[i]]++;
+            }
+        }
     }
 }
 END {
     max_count = 0;
-    max_mechanic = "";
+    # Find the maximum count.
     for (mechanic in count) {
         if (count[mechanic] > max_count) {
             max_count = count[mechanic];
-            max_mechanic = mechanic;
         }
     }
-    print max_mechanic " found in " max_count " games";
+    # Collect all mechanics with the maximum count.
+    n_out = 0;
+    for (mechanic in count) {
+        if (count[mechanic] == max_count) {
+            n_out++;
+            out[n_out] = mechanic;
+        }
+    }
+    # Sort alphabetically and print all.
+    asort(out);
+    for (i=1; i<=n_out; i++) {
+        printf "%s%s", out[i], (i==n_out ? "" : ", ");
+    }
+    print " found in " max_count " games";
 }' "$INPUT_FILE")
 
 echo "The most popular game mechanics is $most_popular_mechanics"
 
-# 2. Find the most popular game domain
-echo "Analyzing most popular game domain..."
+# 2. Find the most popular game domain.
+# For each row, split the domains field by comma, count each domain.
+# If the field is empty or invalid, count as 'Unknown'.
+# If multiple domains are tied for most popular, output all, sorted alphabetically.
 most_popular_domain=$(awk -F'\t' -v col="$DOMAINS_COL" '
 BEGIN { FS="\t"; }
-NR > 1 && $col != "" {
-    # Remove quotes if present
+NR > 1 {
     domains = $col;
-    sub(/^"/, "", domains);
-    sub(/"$/, "", domains);
-    
-    # Split domains by comma and count each
-    n = split(domains, domains_array, ", ");
-    for (i = 1; i <= n; i++) {
-        count[domains_array[i]]++;
+    if (domains == "" || domains == "\"\"" || domains == "\"") {
+        count["Unknown"]++;
+    } else {
+        sub(/^"/, "", domains);
+        sub(/"$/, "", domains);
+        n = split(domains, domains_array, ", ");
+        for (i = 1; i <= n; i++) {
+            if (domains_array[i] == "" || domains_array[i] == "\"\"" || domains_array[i] == "\"") {
+                count["Unknown"]++;
+            } else {
+                count[domains_array[i]]++;
+            }
+        }
     }
 }
 END {
     max_count = 0;
-    max_domain = "";
+    # Find the maximum count.
     for (domain in count) {
         if (count[domain] > max_count) {
             max_count = count[domain];
-            max_domain = domain;
         }
     }
-    print max_domain " found in " max_count " games";
+    # Collect all domains with the maximum count.
+    n_out = 0;
+    for (domain in count) {
+        if (count[domain] == max_count) {
+            n_out++;
+            out[n_out] = domain;
+        }
+    }
+    # Sort alphabetically and print all.
+    asort(out);
+    for (i=1; i<=n_out; i++) {
+        printf "%s%s", out[i], (i==n_out ? "" : ", ");
+    }
+    print " found in " max_count " games";
 }' "$INPUT_FILE")
 
 echo "The most game domain is $most_popular_domain"
 
-# 3. Calculate correlation between year of publication and average rating
+# 3. Calculate the correlation between year of publication and average rating.
+# Only valid numeric rows are used. If not enough data, returns 0.
 year_rating_correlation=$(calculate_correlation $YEAR_COL $RATING_COL)
 echo "The correlation between the year of publication and the average rating is $year_rating_correlation"
 
-# 4. Calculate correlation between game complexity and average rating
+# 4. Calculate the correlation between game complexity and average rating.
+# Only valid numeric rows are used. If not enough data, returns 0.
 complexity_rating_correlation=$(calculate_correlation $COMPLEXITY_COL $RATING_COL)
 echo "The correlation between the complexity of a game and its average rating is $complexity_rating_correlation"
